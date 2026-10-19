@@ -65,6 +65,8 @@
       cursor: pointer;
     }
     button:hover, .file-button:hover { border-color: var(--accent); color: var(--accent); }
+    /* 「朗讀」按鈕在播放中會改為「停止」，不需另佔工具列空間。 */
+    #stopBtn { display: none; }
     .file-button input { display: none; }
     #bookSelect {
       display: none;
@@ -238,7 +240,8 @@
     }
 
     function setLibrary(entries) {
-      library = entries.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant', { numeric: true }));
+      // FileList 會保留使用者在檔案選擇器中決定的順序。
+      library = entries;
       activeEntry = -1;
       const select = $('bookSelect'); select.replaceChildren();
       library.forEach((entry, index) => select.add(new Option(entry.name, String(index))));
@@ -273,7 +276,8 @@
     }
 
     function updateSpeechButtons() {
-      $('readBtn').disabled = reading;
+      $('readBtn').disabled = false;
+      $('readBtn').textContent = reading ? '停止' : '朗讀';
       $('pauseBtn').disabled = !reading;
       $('stopBtn').disabled = !reading;
       $('pauseBtn').textContent = window.speechSynthesis?.paused ? '繼續' : '暫停';
@@ -375,6 +379,7 @@
     $('saveBtn').addEventListener('click', () => save(true));
     $('readBtn').addEventListener('click', () => {
       if (!canSpeak()) { alert('此瀏覽器無法使用網頁朗讀。請用完整的 Chrome 或 Safari 開啟，並確認已安裝中文系統語音。'); return; }
+      if (reading) { stopSpeech(); return; }
       stopSpeech();
       speechChunks = splitForSpeech(content.textContent);
       if (!speechChunks.length) { alert('請先輸入或匯入文字。'); return; }
