@@ -299,17 +299,42 @@
       if (taiwanVoice) select.value = taiwanVoice.name;
     }
 
-    // 長篇文字拆成適合瀏覽器語音引擎處理的小段，避免朗讀到一半中斷。
+    // 優先以句末與段落分段；右引號需附在前一句，避免在「。」與「」」之間停頓。
+    // 只有一個句子過長時，才退回在逗號等較弱的標點處切開。
     function splitForSpeech(text) {
-      const units = text.trim().match(/[^。！？!?；;，,、]+[。！？!?；;，,、]?/g) || [];
+      const source = text.trim();
+      const units = source.match(/[^。！？!?；;]+[。！？!?；;]+[」』）】〉》”’]*/g) || [];
+      const coveredLength = units.join('').length;
+      if (coveredLength < source.length) units.push(source.slice(coveredLength));
       const chunks = [];
       let current = '';
       for (const unit of units) {
-        if ((current + unit).length > 180 && current) { chunks.push(current); current = ''; }
-        current += unit;
+        if ((current + unit).length <= 280 || !current) {
+          current += unit;
+          continue;
+        }
+        chunks.push(current); current = unit;
       }
       if (current) chunks.push(current);
-      return chunks;
+      return chunks.flatMap(chunk => splitLongSpeechChunk(chunk));
+    }
+
+    function splitLongSpeechChunk(chunk) {
+      const maxLength = 320, pieces = [];
+      let remaining = chunk;
+      while (remaining.length > maxLength) {
+        const sample = remaining.slice(0, maxLength + 1);
+        const candidates = ['\n', '，', ',', '、', '：', ':'];
+        let cutAt = -1;
+        for (const mark of candidates) cutAt = Math.max(cutAt, sample.lastIndexOf(mark) + 1);
+        // 找不到自然停頓時，寧可讓語音引擎讀長一點，也不要在句子前半硬切。
+        if (cutAt < maxLength * .55) cutAt = maxLength;
+        while ('」』）】〉》”’'.includes(remaining[cutAt] || '')) cutAt += 1;
+        pieces.push(remaining.slice(0, cutAt));
+        remaining = remaining.slice(cutAt);
+      }
+      if (remaining) pieces.push(remaining);
+      return pieces;
     }
 
     function renderSpeechChunks() {
