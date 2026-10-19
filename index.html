@@ -315,7 +315,7 @@
       const chunks = [];
       let current = '';
       for (const unit of units) {
-        if ((current + unit).length <= 280 || !current) {
+        if ((current + unit).length <= 90 || !current) {
           current += unit;
           continue;
         }
@@ -326,7 +326,7 @@
     }
 
     function splitLongSpeechChunk(chunk) {
-      const maxLength = 320, pieces = [];
+      const maxLength = 140, pieces = [];
       let remaining = chunk;
       while (remaining.length > maxLength) {
         const sample = remaining.slice(0, maxLength + 1);
