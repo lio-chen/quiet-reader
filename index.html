@@ -51,6 +51,7 @@
     .brand { font-weight: 750; letter-spacing: .08em; white-space: nowrap; }
     .spacer { flex: 1; }
     button, .file-button {
+      flex: 0 0 auto;
       appearance: none;
       border: 1px solid var(--rule);
       background: var(--paper);
@@ -59,12 +60,15 @@
       padding: 8px 11px;
       font: inherit;
       font-size: 14px;
+      white-space: nowrap;
+      word-break: keep-all;
       cursor: pointer;
     }
     button:hover, .file-button:hover { border-color: var(--accent); color: var(--accent); }
     .file-button input { display: none; }
     #bookSelect {
       display: none;
+      flex: 0 0 auto;
       max-width: min(260px, 34vw);
       padding: 8px;
       font: inherit;
@@ -127,9 +131,23 @@
     input[type="range"] { accent-color: var(--accent); width: 100%; }
     .notice { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 5px 0 0; }
     @media (max-width: 540px) {
-      .topbar { gap: 7px; }
+      .topbar {
+        gap: 8px;
+        padding: 8px 12px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .topbar::-webkit-scrollbar { display: none; }
       .brand { display: none; }
-      .topbar button, .file-button { padding: 8px; font-size: 13px; }
+      .topbar button, .file-button, #bookSelect {
+        flex: 0 0 auto;
+        min-height: 40px;
+        padding: 7px 10px;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+      /* 內容會自動儲存；手機保留空間給匯入與閱讀控制。 */
+      #saveBtn, #clearBtn { display: none; }
       main { width: 100%; margin: 0; }
       .reader { border: 0; border-radius: 0; box-shadow: none; min-height: calc(100vh - 56px); padding: 27px 24px 60px; }
     }
