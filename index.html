@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f3eb">
+  <title>靜讀 · 個人閱讀器</title>
+  <style>
+    :root {
+      --bg: #f7f3eb;
+      --paper: #fffdf8;
+      --ink: #25231f;
+      --muted: #777168;
+      --rule: #e4ddd0;
+      --accent: #7e5035;
+      --shadow: 0 14px 45px rgba(71, 55, 34, .08);
+    }
+    body.night {
+      --bg: #171817;
+      --paper: #212321;
+      --ink: #ece8dc;
+      --muted: #aaa79d;
+      --rule: #3b3d39;
+      --accent: #e4b58f;
+      --shadow: 0 14px 45px rgba(0, 0, 0, .25);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", sans-serif;
+      transition: background .2s, color .2s;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 56px;
+      padding: 8px clamp(16px, 4vw, 48px);
+      overflow-x: auto;
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--rule);
+    }
+    .brand { font-weight: 750; letter-spacing: .08em; white-space: nowrap; }
+    .spacer { flex: 1; }
+    button, .file-button {
+      appearance: none;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      color: var(--ink);
+      border-radius: 9px;
+      padding: 8px 11px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover, .file-button:hover { border-color: var(--accent); color: var(--accent); }
+    .file-button input { display: none; }
+    #bookSelect {
+      display: none;
+      max-width: min(260px, 34vw);
+      padding: 8px;
+      font: inherit;
+      font-size: 14px;
+    }
+    #bookSelect.visible { display: block; }
+    .progress { position: fixed; z-index: 20; top: 55px; left: 0; height: 3px; width: 0; background: var(--accent); }
+    main { width: min(100% - 32px, 820px); margin: 34px auto 80px; }
+    .reader {
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--rule);
+      border-radius: 14px;
+      padding: clamp(28px, 7vw, 78px);
+    }
+    .book-title {
+      width: 100%;
+      margin: 0 0 12px;
+      padding: 0;
+      color: var(--ink);
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid transparent;
+      outline: 0;
+      font: 700 clamp(26px, 5vw, 40px)/1.3 Georgia, "Noto Serif TC", "Songti TC", serif;
+      letter-spacing: .03em;
+    }
+    .book-title:focus { border-bottom-color: var(--accent); }
+    .hint { color: var(--muted); font-size: 13px; margin: 0 0 32px; }
+    .content {
+      min-height: 55vh;
+      outline: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: Georgia, "Noto Serif TC", "Songti TC", serif;
+      font-size: var(--font-size, 20px);
+      line-height: var(--line-height, 2);
+      letter-spacing: .035em;
+    }
+    .content:empty::before { content: attr(data-placeholder); color: var(--muted); }
+    .content:focus { box-shadow: inset 0 0 0 1px var(--accent); border-radius: 5px; }
+    .speech-active { background: color-mix(in srgb, var(--accent) 25%, transparent); border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+    .settings {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 15;
+      display: none;
+      width: min(330px, calc(100vw - 32px));
+      padding: 18px;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+    .settings.open { display: grid; gap: 15px; }
+    .settings label { display: grid; grid-template-columns: 76px 1fr 48px; gap: 10px; align-items: center; font-size: 14px; }
+    .settings label.wide { grid-template-columns: 76px 1fr; }
+    select { min-width: 0; padding: 6px; color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; }
+    input[type="range"] { accent-color: var(--accent); width: 100%; }
+    .notice { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 5px 0 0; }
+    @media (max-width: 540px) {
+      .topbar { gap: 7px; }
+      .brand { display: none; }
+      .topbar button, .file-button { padding: 8px; font-size: 13px; }
+      main { width: 100%; margin: 0; }
+      .reader { border: 0; border-radius: 0; box-shadow: none; min-height: calc(100vh - 56px); padding: 27px 24px 60px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="progress" class="progress" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="brand">靜讀</div>
+    <label class="file-button">匯入 TXT<input id="fileInput" type="file" accept=".txt,text/plain" multiple></label>
+    <button id="previousBtn" type="button" disabled>上一篇</button>
+    <select id="bookSelect" aria-label="選擇書本或篇章"></select>
+    <button id="nextBtn" type="button" disabled>下一篇</button>
+    <button id="saveBtn" type="button">儲存</button>
+    <button id="readBtn" type="button">朗讀</button>
+    <button id="pauseBtn" type="button" disabled>暫停</button>
+    <button id="stopBtn" type="button" disabled>停止</button>
+    <button id="settingsBtn" type="button" aria-expanded="false" aria-controls="settings">閱讀設定</button>
+    <button id="nightBtn" type="button" title="切換深色模式">☾</button>
+    <div class="spacer"></div>
+    <button id="clearBtn" type="button">清空</button>
+  </header>
+
+  <main>
+    <article class="reader">
+      <input id="title" class="book-title" aria-label="書名" value="未命名閱讀筆記" maxlength="120">
+      <p class="hint">直接貼上或輸入文字；內容只儲存在這台裝置的瀏覽器中。</p>
+      <p id="speechWarning" class="notice">沒有聲音嗎？請改用完整的 Chrome 或 Safari 開啟，並確認已安裝中文系統語音；朗讀時目前段落會反白。</p>
+      <div id="content" class="content" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="在這裡貼上你合法取得的文字，或按「匯入 TXT」。"></div>
+    </article>
+  </main>
+
+  <section id="settings" class="settings" aria-label="閱讀設定">
+    <label>字級<input id="fontSize" type="range" min="15" max="32" value="20"><output id="fontSizeOutput">20px</output></label>
+    <label>行距<input id="lineHeight" type="range" min="14" max="28" value="20"><output id="lineHeightOutput">2.0</output></label>
+    <label class="wide">朗讀語音<select id="voiceSelect" aria-label="朗讀語音"><option>正在載入語音…</option></select></label>
+    <label>朗讀速度<input id="speechRate" type="range" min="7" max="13" value="10"><output id="speechRateOutput">1.0</output></label>
+    <p class="notice">捲動位置、文字與閱讀設定皆會自動記住。匯入文字前請確認你有閱讀與保存的權利。</p>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const title = $('title'), content = $('content'), progress = $('progress');
+    const storageKey = 'quiet-reader-v1';
+    const defaults = { title: '未命名閱讀筆記', text: '', fontSize: 20, lineHeight: 20, night: false, scrollY: 0 };
+    let state = { ...defaults };
+    let speechChunks = [], speechIndex = 0, reading = false, speechSession = 0, voices = [];
+    let library = [], activeEntry = -1;
+    const canSpeak = () => typeof window.speechSynthesis?.speak === 'function' && typeof window.SpeechSynthesisUtterance === 'function';
+
+    // 將來源常見的 HTML 換行與段落標記轉為純文字，避免閱讀頁面直接顯示 <br>。
+    function toPlainText(source) {
+      const withBreaks = String(source)
+        .replace(/<br\s*\/?\s*>/gi, '\n')
+        .replace(/<\/(?:p|div|li|h[1-6])\s*>/gi, '\n');
+      const documentFragment = new DOMParser().parseFromString(withBreaks, 'text/html');
+      return (documentFragment.body.textContent || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\n[ \t]*\n[ \t]*\n+/g, '\n\n')
+        .trim();
+    }
+
+    function fileTitle(filename) {
+      return filename.replace(/\.[^.]+$/, '') || '未命名篇章';
+    }
+
+    function syncActiveEntry() {
+      if (activeEntry >= 0 && library[activeEntry]) library[activeEntry].text = content.textContent;
+    }
+
+    function updateLibraryControls() {
+      const hasLibrary = library.length > 0;
+      $('bookSelect').classList.toggle('visible', hasLibrary);
+      $('previousBtn').disabled = !hasLibrary || activeEntry <= 0;
+      $('nextBtn').disabled = !hasLibrary || activeEntry >= library.length - 1;
+    }
+
+    function openLibraryEntry(index) {
+      if (index < 0 || index >= library.length) return;
+      stopSpeech(); syncActiveEntry();
+      activeEntry = index;
+      const entry = library[index];
+      title.value = entry.name;
+      content.textContent = entry.text;
+      $('bookSelect').value = String(index);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateLibraryControls(); save();
+    }
+
+    function setLibrary(entries) {
+      library = entries.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant', { numeric: true }));
+      activeEntry = -1;
+      const select = $('bookSelect'); select.replaceChildren();
+      library.forEach((entry, index) => select.add(new Option(entry.name, String(index))));
+      openLibraryEntry(0);
+    }
+
+    function save(showFeedback = false) {
+      state.title = title.value.trim() || defaults.title;
+      state.text = content.textContent;
+      state.fontSize = +$('fontSize').value;
+      state.lineHeight = +$('lineHeight').value;
+      state.night = document.body.classList.contains('night');
+      state.scrollY = window.scrollY;
+      localStorage.setItem(storageKey, JSON.stringify(state));
+      if (showFeedback) {
+        const button = $('saveBtn'); const original = button.textContent;
+        button.textContent = '已儲存'; setTimeout(() => button.textContent = original, 1300);
+      }
+    }
+
+    function applySettings() {
+      const fs = $('fontSize').value, lh = $('lineHeight').value;
+      content.style.setProperty('--font-size', `${fs}px`);
+      content.style.setProperty('--line-height', (+lh / 10).toFixed(1));
+      $('fontSizeOutput').textContent = `${fs}px`;
+      $('lineHeightOutput').textContent = (+lh / 10).toFixed(1);
+    }
+
+    function updateProgress() {
+      const height = document.documentElement.scrollHeight - window.innerHeight;
+      progress.style.width = `${height > 0 ? Math.min(100, window.scrollY / height * 100) : 0}%`;
+    }
+
+    function updateSpeechButtons() {
+      $('readBtn').disabled = reading;
+      $('pauseBtn').disabled = !reading;
+      $('stopBtn').disabled = !reading;
+      $('pauseBtn').textContent = window.speechSynthesis?.paused ? '繼續' : '暫停';
+    }
+
+    function loadVoices() {
+      if (!canSpeak()) return;
+      voices = window.speechSynthesis.getVoices();
+      const select = $('voiceSelect');
+      select.replaceChildren();
+      const preferred = voices.filter(voice => /^zh(?:-|$)/i.test(voice.lang));
+      const choices = preferred.length ? preferred : voices;
+      if (!choices.length) {
+        select.add(new Option('找不到語音（請稍候再開啟）', ''));
+        return;
+      }
+      choices.forEach(voice => select.add(new Option(`${voice.name}（${voice.lang}）`, voice.name)));
+      const taiwanVoice = choices.find(voice => /zh-TW/i.test(voice.lang));
+      if (taiwanVoice) select.value = taiwanVoice.name;
+    }
+
+    // 長篇文字拆成適合瀏覽器語音引擎處理的小段，避免朗讀到一半中斷。
+    function splitForSpeech(text) {
+      const units = text.trim().match(/[^。！？!?；;，,、]+[。！？!?；;，,、]?/g) || [];
+      const chunks = [];
+      let current = '';
+      for (const unit of units) {
+        if ((current + unit).length > 180 && current) { chunks.push(current); current = ''; }
+        current += unit;
+      }
+      if (current) chunks.push(current);
+      return chunks;
+    }
+
+    function renderSpeechChunks() {
+      content.replaceChildren();
+      speechChunks.forEach((chunk, index) => {
+        const span = document.createElement('span');
+        span.dataset.speechIndex = index;
+        span.textContent = chunk;
+        content.append(span);
+      });
+    }
+
+    function highlightSpeechChunk(index) {
+      content.querySelector('.speech-active')?.classList.remove('speech-active');
+      const current = content.querySelector(`[data-speech-index="${index}"]`);
+      if (!current) return;
+      current.classList.add('speech-active');
+      current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function speakNext(session) {
+      if (session !== speechSession) return;
+      if (!reading || speechIndex >= speechChunks.length) {
+        reading = false; content.contentEditable = 'true'; updateSpeechButtons(); return;
+      }
+      const chunkIndex = speechIndex++;
+      highlightSpeechChunk(chunkIndex);
+      const utterance = new SpeechSynthesisUtterance(speechChunks[chunkIndex]);
+      utterance.lang = 'zh-TW';
+      utterance.rate = +$('speechRate').value / 10;
+      utterance.volume = 1;
+      const voice = voices.find(item => item.name === $('voiceSelect').value);
+      if (voice) { utterance.voice = voice; utterance.lang = voice.lang; }
+      utterance.onend = () => speakNext(session);
+      utterance.onerror = () => {
+        if (session === speechSession) { reading = false; updateSpeechButtons(); }
+      };
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function stopSpeech() {
+      speechSession += 1;
+      if (canSpeak()) window.speechSynthesis.cancel();
+      speechChunks = []; speechIndex = 0; reading = false; content.contentEditable = 'true'; updateSpeechButtons();
+    }
+
+    try { state = { ...defaults, ...JSON.parse(localStorage.getItem(storageKey)) }; } catch (_) {}
+    title.value = state.title;
+    content.textContent = state.text;
+    $('fontSize').value = state.fontSize;
+    $('lineHeight').value = state.lineHeight;
+    document.body.classList.toggle('night', state.night);
+    applySettings();
+    loadVoices();
+    if (canSpeak()) window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    $('fileInput').addEventListener('change', async (event) => {
+      const files = [...event.target.files];
+      if (!files.length) return;
+      const entries = await Promise.all(files.map(async file => ({ name: fileTitle(file.name), text: toPlainText(await file.text()) })));
+      setLibrary(entries); save(true);
+      event.target.value = '';
+    });
+    $('bookSelect').addEventListener('change', event => openLibraryEntry(+event.target.value));
+    $('previousBtn').addEventListener('click', () => openLibraryEntry(activeEntry - 1));
+    $('nextBtn').addEventListener('click', () => openLibraryEntry(activeEntry + 1));
+    $('saveBtn').addEventListener('click', () => save(true));
+    $('readBtn').addEventListener('click', () => {
+      if (!canSpeak()) { alert('此瀏覽器無法使用網頁朗讀。請用完整的 Chrome 或 Safari 開啟，並確認已安裝中文系統語音。'); return; }
+      stopSpeech();
+      speechChunks = splitForSpeech(content.textContent);
+      if (!speechChunks.length) { alert('請先輸入或匯入文字。'); return; }
+      const session = ++speechSession;
+      renderSpeechChunks(); content.contentEditable = 'false';
+      reading = true; updateSpeechButtons(); window.speechSynthesis.resume(); speakNext(session);
+    });
+    $('pauseBtn').addEventListener('click', () => {
+      if (!canSpeak()) return;
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume(); else window.speechSynthesis.pause();
+      updateSpeechButtons();
+    });
+    $('stopBtn').addEventListener('click', stopSpeech);
+    $('settingsBtn').addEventListener('click', () => {
+      const panel = $('settings'); const opened = panel.classList.toggle('open');
+      $('settingsBtn').setAttribute('aria-expanded', opened);
+    });
+    $('nightBtn').addEventListener('click', () => { document.body.classList.toggle('night'); save(); });
+    $('clearBtn').addEventListener('click', () => {
+      if (content.textContent && !confirm('確定清空目前文字嗎？此操作無法復原。')) return;
+      title.value = defaults.title; content.textContent = ''; localStorage.removeItem(storageKey); window.scrollTo({ top: 0 });
+    });
+    content.addEventListener('paste', (event) => {
+      event.preventDefault();
+      const pasted = event.clipboardData.getData('text/html') || event.clipboardData.getData('text/plain');
+      document.execCommand('insertText', false, toPlainText(pasted));
+    });
+    [title, content, $('fontSize'), $('lineHeight')].forEach(el => el.addEventListener('input', () => { syncActiveEntry(); applySettings(); save(); }));
+    $('speechRate').addEventListener('input', () => $('speechRateOutput').textContent = (+$('speechRate').value / 10).toFixed(1));
+    window.addEventListener('scroll', () => { updateProgress(); save(); }, { passive: true });
+    window.addEventListener('beforeunload', () => save());
+    window.addEventListener('beforeunload', stopSpeech);
+    window.addEventListener('load', () => { window.scrollTo({ top: state.scrollY }); updateProgress(); });
+  </script>
+</body>
+</html>
