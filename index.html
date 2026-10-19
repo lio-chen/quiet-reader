@@ -112,7 +112,13 @@
     }
     .content:empty::before { content: attr(data-placeholder); color: var(--muted); }
     .content:focus { box-shadow: inset 0 0 0 1px var(--accent); border-radius: 5px; }
-    .speech-active { background: color-mix(in srgb, var(--accent) 25%, transparent); border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+    .speech-active {
+      background: color-mix(in srgb, var(--accent) 25%, transparent);
+      border-radius: 3px;
+      scroll-margin-top: 76px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
     .settings {
       position: fixed;
       right: 16px;
@@ -352,7 +358,8 @@
       const current = content.querySelector(`[data-speech-index="${index}"]`);
       if (!current) return;
       current.classList.add('speech-active');
-      current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 第一段必須先到位才開始朗讀，避免平滑捲動途中漏看開頭。
+      current.scrollIntoView({ behavior: index === 0 ? 'auto' : 'smooth', block: 'start' });
     }
 
     function speakNext(session) {
